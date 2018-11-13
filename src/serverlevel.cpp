@@ -17,6 +17,12 @@ ServerLevel::ServerLevel(std::string map)
 void ServerLevel::init(b2World* physWorld)
 {
     GameLevel::init(physWorld);
+
+    boost::asio::ip::tcp::acceptor acceptor(Core::instance().get_context(), boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 10058));
+
+    //Connector connector(ID, Core::instance().get_context(), acceptor);
+    //std::cout << "Host game\n";
+    //connector.create_own_room();
 }
 
 void ServerLevel::handle_input_data()
