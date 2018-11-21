@@ -11,7 +11,7 @@ public:
     typedef boost::shared_ptr<Peer> ptr;
     typedef boost::system::error_code error_code;
 
-    static ptr create_peer(boost::asio::io_context *context);
+    static ptr create_peer(boost::asio::io_context *context, std::string ID);
 
     void start();
     void stop();
@@ -28,7 +28,7 @@ public:
 
 
 private:
-    Peer(boost::asio::io_context *context);
+    Peer(boost::asio::io_context *context, std::string ID);
 
     void do_read();
     void on_read(const error_code & err, size_t bytes);

@@ -3,7 +3,7 @@
 // ~~~~~~~~~~~~~~~~~~~~
 //
 // Copyright (c) 2005 Voipster / Indrek dot Juhani at voipster dot com
-// Copyright (c) 2005-2018 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2005-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -510,26 +510,23 @@ BOOST_ASIO_SYNC_OP_VOID context::add_certificate_authority(
   bio_cleanup bio = { make_buffer_bio(ca) };
   if (bio.p)
   {
-    if (X509_STORE* store = ::SSL_CTX_get_cert_store(handle_))
+    x509_cleanup cert = { ::PEM_read_bio_X509(bio.p, 0, 0, 0) };
+    if (cert.p)
     {
-      for (;;)
+      if (X509_STORE* store = ::SSL_CTX_get_cert_store(handle_))
       {
-        x509_cleanup cert = { ::PEM_read_bio_X509(bio.p, 0, 0, 0) };
-        if (!cert.p)
-          break;
-
-        if (::X509_STORE_add_cert(store, cert.p) != 1)
+        if (::X509_STORE_add_cert(store, cert.p) == 1)
         {
-          ec = boost::system::error_code(
-              static_cast<int>(::ERR_get_error()),
-              boost::asio::error::get_ssl_category());
+          ec = boost::system::error_code();
           BOOST_ASIO_SYNC_OP_VOID_RETURN(ec);
         }
       }
     }
   }
 
-  ec = boost::system::error_code();
+  ec = boost::system::error_code(
+      static_cast<int>(::ERR_get_error()),
+      boost::asio::error::get_ssl_category());
   BOOST_ASIO_SYNC_OP_VOID_RETURN(ec);
 }
 

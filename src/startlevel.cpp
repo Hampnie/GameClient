@@ -2,6 +2,7 @@
 #include "common.h"
 #include "core.h"
 #include "startlevel.h"
+#include "clientlevel.h"
 
 #include "tinyfiledialogs.h"
 
@@ -11,11 +12,11 @@
 #include <sstream>
 #include <fstream>
 
-void StartLevel::init(b2World *physWorld)
+void StartLevel::init(std::shared_ptr<b2World> physWorld)
 {
     Level::init(physWorld);
 
-    glm::vec2 windowSize = Core::instance().getWindowSize();
+    glm::vec2 windowSize = Core::instance().get_window_size();
 
     FRect position{windowSize.x / 2 - 150.0f, windowSize.y * 1 / 5 - 65.5f , 300.0f, 131.0f};
     hostButton = std::unique_ptr<Button>(new Button(position, "textures/Start.png", "textures/Start_press.png", "textures/Start_hover.png"));
@@ -26,7 +27,7 @@ void StartLevel::init(b2World *physWorld)
     FRect position2{windowSize.x / 2 - 150.0f, windowSize.y * 4/ 5 - 65.5f, 300.0f, 131.0f};
     exitButton = std::unique_ptr<Button>(new Button(position2, "textures/Exit.png", "textures/Exit_press.png", "textures/Exit_hover.png"));
     auto exitFunc = []() {
-        Core::instance().closeGame();
+        Core::instance().close_game();
              };
 
     exitButton->OnPressed.connect(exitFunc);
@@ -47,7 +48,7 @@ void StartLevel::update(float dt)
 
 }
 
-void StartLevel::draw(ShaderProgram *shader)
+void StartLevel::draw(std::shared_ptr<ShaderProgram> shader)
 {
     hostButton->draw(shader);
     connectButton->draw(shader);
@@ -72,14 +73,55 @@ void StartLevel::host_game()
     buffer << levelFile.rdbuf();
 
     ServerLevel *ptr = new ServerLevel(buffer.str());
-    Core::instance().installLevel(ptr);
+    Core::instance().install_level(ptr);
 }
 
 void StartLevel::connect_to_game()
 {
+    /*
 	char const * lTmp;
 	lTmp = tinyfd_inputBox(
 		"IP", "Enter an IP adress", NULL);
 
 	// Connect to server
+*/
+
+
+    std::cout << "Connect to: " << "127.0.0.1" << "\n";
+    boost::asio::ip::tcp::endpoint ep( boost::asio::ip::address::from_string("127.0.0.1"), 10058);
+    boost::asio::ip::tcp::socket* socket = new boost::asio::ip::tcp::socket(*Core::instance().get_context());
+    
+    try {
+
+        socket->connect(ep);
+    } catch (boost::system::system_error const& e)
+    {
+        std::cout << "Warning: could not connect : " << e.what() << std::endl;
+        exit(1);
+    } 
+
+    std::cout << "Connected to room\n" << std::endl;
+
+    socket->write_some(boost::asio::buffer("Player \n")); // Send ID player
+
+    // Get map from server
+    char buf[1024];
+	//int bytes = boost::asio::read(socket, boost::asio::buffer(buf), boost::bind(read_complete,buf,_1,_2));
+	socket->read_some(boost::asio::buffer(buf));
+
+    ClientLevel *ptr = new ClientLevel(buf, socket);
+    Core::instance().install_level(ptr);
+}
+
+void StartLevel::on_connect(const boost::system::error_code &err)
+{
+    std::cout << "On connect \n";
+}
+
+size_t StartLevel::read_complete(char * buf, const boost::system::error_code & err, size_t bytes) 
+{
+	if ( err) return 0;
+	bool found = std::find(buf, buf + bytes, '\n') < buf + bytes;
+	// we read one-by-one until we get to enter, no buffering
+	return found ? 0 : 1;
 }

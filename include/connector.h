@@ -7,6 +7,8 @@
 
 #include "../include/peer.h"
 
+
+
 class Connector : public boost::enable_shared_from_this<Connector>, boost::noncopyable
 {
 public:
