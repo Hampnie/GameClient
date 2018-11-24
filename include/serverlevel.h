@@ -8,6 +8,7 @@
 #include "gamelevel.h"
 #include "fighter.h"
 #include <list>
+#include <vector>
 
 class b2World;
 
@@ -27,18 +28,22 @@ private:
     virtual void handle_input_data() override;
 
     void wait_new_player();
-    void handle_accept(boost::asio::ip::tcp::socket* player, const boost::system::error_code &err);
+    void handle_accept(boost::asio::ip::tcp::socket* playerSocket, const boost::system::error_code &err);
 
-    void do_read(boost::asio::ip::tcp::socket* player);
-    void on_read(boost::asio::ip::tcp::socket* player, const boost::system::error_code &err, size_t bytes);
-    void read(boost::asio::ip::tcp::socket* player);
+    void do_read(boost::asio::ip::tcp::socket* playerSocket);
+    void on_read(boost::asio::ip::tcp::socket* playerSocket, const boost::system::error_code &err, size_t bytes);
+    void read(boost::asio::ip::tcp::socket* playerSocket);
+
+    void on_send_message(const boost::system::error_code &err, size_t bytes);
 
     size_t read_complete(const boost::system::error_code & err, size_t bytes);
 
     std::shared_ptr<b2World> phWorld;
 
+    std::string map;
+    std::vector<command_struct> in_commands, out_commands; // Command for handle
     acc_ptr acceptor;
-    std::list<Fighter*> players;
+    std::list<boost::asio::ip::tcp::socket*> sockets;
     char buff[512];
 };
 

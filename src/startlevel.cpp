@@ -102,12 +102,11 @@ void StartLevel::connect_to_game()
 
     std::cout << "Connected to room\n" << std::endl;
 
-    socket->write_some(boost::asio::buffer("Player \n")); // Send ID player
-
     // Get map from server
     char buf[1024];
 	//int bytes = boost::asio::read(socket, boost::asio::buffer(buf), boost::bind(read_complete,buf,_1,_2));
 	socket->read_some(boost::asio::buffer(buf));
+
 
     ClientLevel *ptr = new ClientLevel(buf, socket);
     Core::instance().install_level(ptr);

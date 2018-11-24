@@ -25,7 +25,10 @@ private:
     void on_read(const boost::system::error_code &err, size_t bytes);
     size_t read_complete(const boost::system::error_code & err, size_t bytes);
 
+    void on_send_message(const boost::system::error_code &err, size_t bytes);
+
     boost::asio::ip::tcp::socket* playerSocket;
+    std::vector<command_struct> in_commands, out_commands;; // Command for handle
     char buff[512];
 };
 
