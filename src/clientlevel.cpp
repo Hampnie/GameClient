@@ -2,124 +2,227 @@
 #include <Box2D/Box2D.h>
 #include <sstream>
 #include <stdlib.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "core.h"
 #include "input.h"
 #include "connector.h"
+#include "shaderProgram.h"
+#include "endgamelevel.h"
 
 ClientLevel::ClientLevel(std::string map, boost::asio::ip::tcp::socket* playerSocket)
-: 	GameLevel(map),
-	playerSocket(playerSocket)
+: 	playerSocket(playerSocket),
+    map(map)
 {
-
+    glm::vec2 windowSize = Core::instance().get_window_size();
+    screenX = windowSize.x;
+    screenY = windowSize.y;
 }
 
 void ClientLevel::init(std::shared_ptr<b2World> physWorld)
 {
-    GameLevel::init(physWorld);
+    // Load map ========================================================================================
+    float x, y, width, height;
+    std::stringstream stream(map);
 
-    mainFighter->set_ID(std::string("Numb"));
-    //std::string str = "new " +  mainFighter->get_ID() + "\n";
-    //playerSocket->write_some(boost::asio::buffer(str)); // Send ID player
-    //std::cout << str;
-    //do_read();
+    while(stream)
+    {
+        stream >> x >> y >> width >> height;
+        FRect position1{x, y, width, height};
+        EmptyEntity* wall = new EmptyEntity(position1, EmptyEntity::texture_type::Wall, "Wall");
+        add_entity(wall);
+    }
+    //==================================================================================================
 
-    std::stringstream sendData;
-    sendData << "new " << mainFighter->get_ID() << "\n";
-    out_commands.push_back(command_struct(sendData.str(), playerSocket));
+    out_commands.push_back(command_struct("new\n", playerSocket));
     do_read();
 }
 
 void ClientLevel::handle_input_data()
 {
-    // Handle data from all players-----------------------------------------
+    // Handle data from server-----------------------------------------
     for ( command_struct &command : in_commands)
     {
         std::stringstream stream(command.str);
-                std::cout << buff << "\n";
-        while(stream)
+        //std::cout << command.str;
+
+        std::string str;
+        std::string ID;
+        float x, y, width, height;
+        float angle;
+
+        stream >> str; // Get command
+        if(str == "start")
         {
-            std::string command;
-            std::string ID;
-            //bool up, down, right, left;
-            float x, y;
-            float angle;
-            stream >> command; // Get command
-            if(command == "move")
-            {
-                //stream >> ID >> up >> down >> right >> left >> angle;
-                stream >> ID >> x >> y >> angle;
-                // Find fighter with that ID 
-                bool found = false;   
-                for (Fighter* fighter : players)
-                {
-                    if(fighter->get_ID() == ID)
-                    {
-                        // Set position and angle
-                        found = true;
-                        //fighter->set_direction(up, down, right, left);
-                        fighter->set_position(x, y);
-                        fighter->set_angle(angle);
-                    }
-                }
-                if(found) continue;
-                // If player wasn't found
-                // Create him
-                FRect position{x, y, 80.0f, 84.0f};
-                if(ID == "Admin")
-                {
-                    Fighter* fighter = new Fighter (position, physWorld, playerSocket);
-                }
-                Fighter* fighter = new Fighter (position, physWorld);
-
-                fighter->set_ID(ID);
-                add_entity(fighter);
-                players.push_back(fighter);
-
-            } else if( command == "bullet")
-            {
-                glm::vec2 bulletPoint;
-                glm::vec2 playerPosition;
-                stream >> bulletPoint.x >> bulletPoint.y >> playerPosition.x >> playerPosition.y;
-                launch_bullet(bulletPoint, false, playerPosition);
-            }       
-            
+            stream >> ID >> x >> y >> angle;
+            FRect position{x, y, 80.0f, 84.0f};
+            mainFighter = std::make_shared<EmptyEntity>(position, EmptyEntity::texture_type::Player, ID);
+            add_entity(mainFighter.get());
+            players.push_back(mainFighter.get());
         }
+        else if(str == "move")
+        {
+            stream >> ID >> x >> y >> angle;
+            for (EmptyEntity* fighter : players)
+            {
+                if(fighter->get_ID() == ID)
+                {
+                    // Set position and angle
+                    fighter->set_position(x, y);
+                    fighter->set_angle(angle);
+                    continue;
+                }
+            }
+
+            // If player not found
+            // Create him
+            FRect position{x, y, 80.0f, 84.0f};
+            EmptyEntity* fighter = new EmptyEntity (position, EmptyEntity::texture_type::Player, ID);
+            fighter->set_angle(angle);
+            add_entity(fighter);
+            players.push_back(fighter);
+        } 
+        else if( str == "bullet")
+        {
+            stream >> ID >> x >> y;
+            bool isFound = false;
+            for (EmptyEntity* bullet : bullets)
+            {
+                if(bullet->get_ID() == ID)
+                {
+                    // Set position
+                    bullet->set_position(x, y);
+                    isFound = true;
+                }
+            }
+            if(isFound)
+                continue;
+
+            // If bullet not found
+            // Create it
+            FRect position{x, y, 10.0f, 10.0f};
+            EmptyEntity* bullet = new EmptyEntity (position, EmptyEntity::texture_type::Bullet, ID);
+            add_entity(bullet);
+            bullets.push_back(bullet);
+        }
+        else if( str == "delete")
+        {
+            stream >> ID;
+            for (auto it = bullets.begin(); it != bullets.end(); )
+            {
+                if((*it)->get_ID() == ID)
+                {
+                    it = bullets.erase( it );
+                    Core::instance().delete_entity(static_cast<EmptyEntity*>((*it)));
+                } else it ++;
+            }
+            for (auto it = players.begin(); it != players.end(); )
+            {
+                if((*it)->get_ID() == ID)
+                {
+                    // If it is you
+                    if(ID == mainFighter->get_ID())
+                    {
+                        // Create End game level
+                        EndGameLevel *ptr = new EndGameLevel();
+                        Core::instance().install_level(ptr);
+                    }
+                    it = players.erase( it );
+                    Core::instance().delete_entity(static_cast<EmptyEntity*>((*it)));
+                } else it ++;
+            }
+        }   
+        else 
+        {
+            std::cout << "Undefined command: " << str << "\n";
+        }              
     }
     in_commands.clear();
 }
 
 void ClientLevel::send_data()
 {
-    std::stringstream sendData;
-    //bool up, down, left, right;
-    //mainFighter->get_direction(up, down, right, left);
-    sendData << "move " << mainFighter->get_ID() << " " << mainFighter->get_rect().x << " " << mainFighter->get_rect().y << " "<< mainFighter->get_angle() << "\n";
-    playerSocket->async_write_some(boost::asio::buffer(sendData.str()), boost::bind(&ClientLevel::on_send_message, this, _1, _2));
-
     for ( command_struct &command : out_commands)
     {
-        std::cout<<command.str;
         command.playerSocket->async_write_some(boost::asio::buffer(command.str), boost::bind(&ClientLevel::on_send_message, this, _1, _2));
     }
-    out_commands.clear();    
+    out_commands.clear();   
 }
 
-void ClientLevel::input_handler(float dt) 
+void ClientLevel::update(float dt) 
 {
-	GameLevel::input_handler(dt);
-
-
-    if(Input::buttonPressed(SDL_BUTTON_LEFT))
+    Level::update(dt);
+    // Send key to server
+    if(Input::keyPressed(SDLK_w))
+    {
+        std::stringstream sendData;
+        sendData << "keyPress w " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket));  
+    }
+    if(Input::keyPressed(SDLK_s))
+    {        
+        std::stringstream sendData;
+        sendData << "keyPress s " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket)); 
+    }
+    if(Input::keyPressed(SDLK_a))
+    {
+        std::stringstream sendData;
+        sendData << "keyPress a " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket)); 
+    }
+    if(Input::keyPressed(SDLK_d))
+    {
+        std::stringstream sendData;
+        sendData << "keyPress d " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket)); 
+    }
+    if(Input::keyReleased(SDLK_w))
+    {
+        std::stringstream sendData;
+        sendData << "keyRelease w " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket)); 
+    }
+    if(Input::keyReleased(SDLK_s))
+    {        
+        std::stringstream sendData;
+        sendData << "keyRelease s "<< mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket));
+    }
+    if(Input::keyReleased(SDLK_a))
+    {
+        std::stringstream sendData;
+        sendData << "keyRelease a " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket));
+    }
+    if(Input::keyReleased(SDLK_d))
+    {
+        std::stringstream sendData;
+        sendData << "keyRelease d " << mainFighter->get_ID() << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket));
+    }
+    if(Input::buttonPressed(SDL_BUTTON_LEFT) && cooldown >= 1.0f)
     {
         glm::vec2 mousePos = Input::mousePosition();
-        if(launch_bullet(glm::vec2(mousePos.x - screenX/2, mousePos.y - screenY/2), true))
-        {
-            std::stringstream sendData;
-            sendData << "bullet " << (mousePos.x - screenX/2) << " " << (mousePos.y - screenY/2) << " " << mainFighter->get_rect().x << " " << mainFighter->get_rect().y <<"\n";
-            out_commands.push_back(command_struct(sendData.str(), playerSocket));
-        }        
+        std::stringstream sendData;
+        sendData << "bullet " << mainFighter->get_ID()<< " " << (mousePos.x - screenX/2) << " " << (mousePos.y - screenY/2) << "\n";
+        out_commands.push_back(command_struct(sendData.str(), playerSocket));    
+        cooldown = 0.0f;  
     }	
+
+    if(mainFighter)
+    {
+        // Calculate and send angle
+        glm::vec2 mousePos = Input::mousePosition();
+        glm::vec2 playerCenter{screenX/2, screenY/2};
+        float newAngle = atan2(playerCenter.y - mousePos.y, playerCenter.x - mousePos.x);
+
+        std::stringstream angleData;
+        angleData << "angle " << mainFighter->get_ID() << " " << newAngle << "\n";
+        out_commands.push_back(command_struct(angleData.str(), playerSocket));
+    }
+    
+    cooldown += dt;
 }
 
 size_t ClientLevel::read_complete(const boost::system::error_code & err, size_t bytes)
@@ -136,7 +239,6 @@ size_t ClientLevel::read_complete(const boost::system::error_code & err, size_t 
 
 void ClientLevel::on_read(const boost::system::error_code &err, size_t bytes)
 {
-    std::stringstream stream(buff);
     in_commands.push_back(command_struct(buff, playerSocket));
     do_read();
 }
@@ -151,4 +253,18 @@ void ClientLevel::do_read()
 void ClientLevel::on_send_message(const boost::system::error_code &err, size_t bytes)
 {
 
+}
+
+void ClientLevel::draw(std::shared_ptr<ShaderProgram> shader)
+{
+    if(mainFighter)
+    {
+        glm::mat4 view;
+        FRect rectangle = mainFighter->get_rectangle();
+        view = glm::translate(view, glm::vec3(-(rectangle.x + rectangle.width / 2.0f) + screenX/2, -(rectangle.y + rectangle.height / 2.0f) + screenY/2, -3.0f));
+
+        shader->set_mat4("view", view);
+    }    
+
+    Level::draw(shader);    
 }

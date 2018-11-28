@@ -1,5 +1,5 @@
-#ifndef STARTLEVEL_H
-#define STARTLEVEL_H
+#ifndef START_LEVEL_H
+#define START_LEVEL_H
 
 #include <memory>
 #include <iostream>
@@ -31,4 +31,4 @@ private:
     std::unique_ptr<Button> exitButton;
 };
 
-#endif // STARTLEVEL_H
+#endif // START_LEVEL_H

@@ -1,21 +1,25 @@
-#ifndef CLIENTLEVEL_H
-#define CLIENTLEVEL_H
+#ifndef CLIENT_LEVEL_H
+#define CLIENT_LEVEL_H
 
 #include <string>
 #include <boost/asio.hpp>
 
-#include "gamelevel.h"
+#include "emptyEntity.h"
+#include "level.h"
 
 class b2World;
 
-class ClientLevel : public GameLevel
+class ClientLevel : public Level
 {
 public:
     ClientLevel(std::string map, boost::asio::ip::tcp::socket* playerSocket);
     ~ClientLevel() {}
+    void release() override {}
     void init(std::shared_ptr<b2World> physWorld) override;
 
-    virtual void input_handler(float dt) override;
+    virtual void update(float dt) override;
+
+    virtual void draw(std::shared_ptr<ShaderProgram> shader) override;
 
 private:
     virtual void send_data() override;
@@ -29,7 +33,17 @@ private:
 
     boost::asio::ip::tcp::socket* playerSocket;
     std::vector<command_struct> in_commands, out_commands;; // Command for handle
+
+    float screenX, screenY;
+    std::vector<EmptyEntity*> players;
+    std::vector<EmptyEntity*> bullets;
+    float cooldown;
+    std::string map;
+    std::shared_ptr<EmptyEntity> mainFighter;
+    const float player_width = 80.0f;
+    const float player_height = 84.0f;
+    
     char buff[512];
 };
 
-#endif // CLIENTLEVEL_H
+#endif // CLIENT_LEVEL_H
