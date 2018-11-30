@@ -12,7 +12,7 @@ void EndGameLevel::init(std::shared_ptr<b2World> physWorld)
     glm::vec2 windowSize = Core::instance().get_window_size();
 
     FRect position{windowSize.x / 2 - 150.0f, windowSize.y / 2 - 65.5f, 300.0f, 131.0f};
-    returnButton = std::unique_ptr<Button>(new Button(position, "textures/Return.png", "textures/Return_press.png", "textures/Return_hover.png"));
+    returnButton = std::unique_ptr<Button>(new Button(position, "textures/Restart.png", "textures/Restart_press.png", "textures/Restart_hover.png"));
 
     auto returnFunc = []() {
         StartLevel *startLevel = new StartLevel();

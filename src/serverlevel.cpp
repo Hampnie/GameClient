@@ -208,47 +208,44 @@ void ServerLevel::send_data()
 
 void ServerLevel::wait_new_player()
 {
-	sockets.push_back(new boost::asio::ip::tcp::socket(*Core::instance().get_context()));
-
-	acceptor->async_accept(*sockets.back(), boost::bind(&ServerLevel::handle_accept, this, sockets.back(), _1));
+	clients.push_back(new Client());
+	acceptor->async_accept(*clients.back()->get_socket(), boost::bind(&ServerLevel::handle_accept, this, clients.back(), _1));
 	std::cout << "Waiting new players...\n";	
 }
 
-void ServerLevel::handle_accept(boost::asio::ip::tcp::socket* playerSocket, const boost::system::error_code &err)
+void ServerLevel::handle_accept(Client *client, const boost::system::error_code &err)
 {
 	std::cout<< "Player connected.\n";
 
 	//Send map to player
-	playerSocket->async_write_some(boost::asio::buffer(map), boost::bind(&ServerLevel::on_send_message, this, _1, _2));
+	client->get_socket()->async_write_some(boost::asio::buffer(map), boost::bind(&ServerLevel::on_send_message, this, _1, _2));
 	
-	do_read(playerSocket);
+	do_read(client);
 	wait_new_player();	
 }
 
-void ServerLevel::on_read(boost::asio::ip::tcp::socket* playerSocket, const boost::system::error_code &err, size_t bytes)
+void ServerLevel::on_read(Client *client, const boost::system::error_code &err, size_t bytes)
 {
-	in_commands.push_back(command_struct(buff, playerSocket));
-
-	do_read(playerSocket);
+	in_commands.push_back(command_struct(client->get_buffer(), client->get_socket()));
+	do_read(client);
 }
 
-void ServerLevel::do_read(boost::asio::ip::tcp::socket* playerSocket)
+void ServerLevel::do_read(Client *client)
 {
-	//memset(buff, 0, sizeof(buff));
-	//player->async_read_some(boost::asio::buffer(buff), boost::bind(&ServerLevel::on_read, this, player, _1));
-	boost::asio::async_read(*playerSocket, boost::asio::buffer(buff),
-                            boost::bind(&ServerLevel::read_complete, this, _1, _2),
-                            boost::bind(&ServerLevel::on_read, this, playerSocket, _1, _2));
+	boost::asio::async_read(*client->get_socket(), boost::asio::buffer(client->get_buffer()),
+                            boost::bind(&ServerLevel::read_complete, this, client, _1, _2),
+                            boost::bind(&ServerLevel::on_read, this, client, _1, _2));
 }
 
-size_t ServerLevel::read_complete(const boost::system::error_code & err, size_t bytes)
+
+size_t ServerLevel::read_complete(Client *client, const boost::system::error_code & err, size_t bytes)
 {
-	if ( err)
+    if ( err)
     {
         std::cout << err << std::endl;
         return 0;
     }
-    bool found = std::find(buff, buff + bytes, '\n') < buff + bytes;
+    bool found = std::find(client->get_buffer(), client->get_buffer() + bytes, '\n') < client->get_buffer() + bytes;
     // we read one-by-one until we get to enter, no buffering
     return found ? 0 : 1;
 }
@@ -316,11 +313,8 @@ void ServerLevel::update(float dt)
                     
                 } else
                 {
-                    // Immediately send it to player
-                    std::stringstream sendData;
-                    sendData << "delete " << fighter->get_ID() <<"\n";
-                    fighter->get_socket()->async_write_some(boost::asio::buffer(sendData.str()), boost::bind(&ServerLevel::on_send_message, this, _1, _2));
-                    players.erase( std::remove( players.begin(), players.end(), entity ), players.end() );
+                    // Immediately delete and send it to players
+                    delete_player(entity);                    
                 }
             }
         }
@@ -335,7 +329,6 @@ void ServerLevel::update(float dt)
         // Then send data
         std::stringstream sendData;
         sendData << "delete " << entity->get_ID() <<"\n";
-        std::cout << sendData.str();
         out_commands.push_back(command_struct(sendData.str(), mainFighter->get_socket()));
     }
 }
@@ -395,3 +388,30 @@ std::string ServerLevel::generate_random_id()
     }    
 }
 
+void ServerLevel::delete_player(EmptyEntity* delete_entity)
+{
+    std::stringstream sendData;
+    sendData << "delete " << dynamic_cast<Fighter*>(delete_entity)->get_ID() <<"\n";
+    dynamic_cast<Fighter*>(delete_entity)->get_socket()->async_write_some(boost::asio::buffer(sendData.str()), boost::bind(&ServerLevel::on_send_message, this, _1, _2));
+    players.erase( std::remove( players.begin(), players.end(), delete_entity ), players.end() );
+
+    // Also delete socket and buffer
+    auto it = std::find_if(clients.begin(), clients.end(),
+             [delete_entity](Client * c) -> bool { return c->get_socket() == dynamic_cast<Fighter*>(delete_entity)->get_socket(); });
+    clients.erase(it);
+}
+
+ServerLevel::~ServerLevel()
+{
+    for(auto &it : clients) 
+        delete it;
+    clients.clear();
+
+    for(auto &it : players) 
+        delete it;
+    players.clear();
+
+    for(auto &it : bullets) 
+        delete it;
+    bullets.clear();
+}

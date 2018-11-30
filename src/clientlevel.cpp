@@ -44,7 +44,6 @@ void ClientLevel::handle_input_data()
     for ( command_struct &command : in_commands)
     {
         std::stringstream stream(command.str);
-        //std::cout << command.str;
 
         std::string str;
         std::string ID;
@@ -127,8 +126,8 @@ void ClientLevel::handle_input_data()
                         EndGameLevel *ptr = new EndGameLevel();
                         Core::instance().install_level(ptr);
                     }
-                    it = players.erase( it );
                     Core::instance().delete_entity(static_cast<EmptyEntity*>((*it)));
+                    it = players.erase( it );                    
                 } else it ++;
             }
         }   
@@ -245,9 +244,11 @@ void ClientLevel::on_read(const boost::system::error_code &err, size_t bytes)
 
 void ClientLevel::do_read()
 {
+    //playerSocket->async_read_some(boost::asio::buffer(buff), boost::bind(&ClientLevel::on_read, this, buff, _1, _2));
+
     boost::asio::async_read(*playerSocket, boost::asio::buffer(buff),
-                            boost::bind(&ClientLevel::read_complete, this, _1, _2),
-                            boost::bind(&ClientLevel::on_read, this, _1, _2));
+                          boost::bind(&ClientLevel::read_complete, this, _1, _2),
+                           boost::bind(&ClientLevel::on_read, this, _1, _2));
 }
 
 void ClientLevel::on_send_message(const boost::system::error_code &err, size_t bytes)
@@ -267,4 +268,18 @@ void ClientLevel::draw(std::shared_ptr<ShaderProgram> shader)
     }    
 
     Level::draw(shader);    
+}
+
+ClientLevel::~ClientLevel()
+{
+    for(auto &it : players) 
+        delete it;
+    players.clear();
+
+    for(auto &it : bullets) 
+        delete it;
+    bullets.clear();
+
+    if(playerSocket)
+        delete playerSocket;
 }

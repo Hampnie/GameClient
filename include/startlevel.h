@@ -13,11 +13,10 @@ class StartLevel : public Level
 {
 public:
     StartLevel() {}
-    ~StartLevel() {std::cout << "Dctor\n";}
+    ~StartLevel() {}
     void init(std::shared_ptr<b2World> physWorld) override;
     void draw(std::shared_ptr<ShaderProgram> shader) override;
     void update(float dt) override;
-    void release() override {}
 
     void host_game();
     void connect_to_game();

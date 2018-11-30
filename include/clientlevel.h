@@ -13,8 +13,8 @@ class ClientLevel : public Level
 {
 public:
     ClientLevel(std::string map, boost::asio::ip::tcp::socket* playerSocket);
-    ~ClientLevel() {}
-    void release() override {}
+    ~ClientLevel(); 
+
     void init(std::shared_ptr<b2World> physWorld) override;
 
     virtual void update(float dt) override;

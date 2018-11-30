@@ -19,7 +19,7 @@ void StartLevel::init(std::shared_ptr<b2World> physWorld)
     glm::vec2 windowSize = Core::instance().get_window_size();
 
     FRect position{windowSize.x / 2 - 150.0f, windowSize.y * 1 / 5 - 65.5f , 300.0f, 131.0f};
-    hostButton = std::unique_ptr<Button>(new Button(position, "textures/Start.png", "textures/Start_press.png", "textures/Start_hover.png"));
+    hostButton = std::unique_ptr<Button>(new Button(position, "textures/Host.png", "textures/Host_press.png", "textures/Host_hover.png"));
 
     hostButton->OnPressed.connect(boost::bind(&StartLevel::host_game, this));
 
@@ -34,7 +34,7 @@ void StartLevel::init(std::shared_ptr<b2World> physWorld)
 
 
     FRect position3{windowSize.x / 2 - 150.0f, windowSize.y * 2.5 / 5 - 65.5f, 300.0f, 131.0f};
-    connectButton = std::unique_ptr<Button>(new Button(position3, "textures/Exit.png", "textures/Exit_press.png", "textures/Exit_hover.png"));
+    connectButton = std::unique_ptr<Button>(new Button(position3, "textures/Connect.png", "textures/Connect_press.png", "textures/Connect_hover.png"));
 
     connectButton->OnPressed.connect(boost::bind(&StartLevel::connect_to_game, this));
 
@@ -78,17 +78,14 @@ void StartLevel::host_game()
 
 void StartLevel::connect_to_game()
 {
-    /*
+
 	char const * lTmp;
 	lTmp = tinyfd_inputBox(
-		"IP", "Enter an IP adress", NULL);
+		"IP", "Enter an IP adress", " ");
 
 	// Connect to server
-*/
-
-
-    std::cout << "Connect to: " << "127.0.0.1" << "\n";
-    boost::asio::ip::tcp::endpoint ep( boost::asio::ip::address::from_string("127.0.0.1"), 10058);
+    std::cout << "Connect to: " << lTmp << "\n";
+    boost::asio::ip::tcp::endpoint ep( boost::asio::ip::address::from_string(lTmp), 10058);
     boost::asio::ip::tcp::socket* socket = new boost::asio::ip::tcp::socket(*Core::instance().get_context());
     
     try {
@@ -99,12 +96,8 @@ void StartLevel::connect_to_game()
         std::cout << "Warning: could not connect : " << e.what() << std::endl;
         exit(1);
     } 
-
-    std::cout << "Connected to room\n" << std::endl;
-
     // Get map from server
     char buf[1024];
-	//int bytes = boost::asio::read(socket, boost::asio::buffer(buf), boost::bind(read_complete,buf,_1,_2));
 	socket->read_some(boost::asio::buffer(buf));
 
 

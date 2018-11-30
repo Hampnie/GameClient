@@ -16,7 +16,6 @@ public:
     void init(std::shared_ptr<b2World> physWorld) override;
     void draw(std::shared_ptr<ShaderProgram> shader) override;
     void update(float dt) override;
-    void release() override {}
 
 private:
     std::unique_ptr<Button> returnButton;
