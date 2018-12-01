@@ -24,5 +24,5 @@ find_package(OpenGL REQUIRED)
 
 	 
 add_executable(${PROJECT_NAME} ${SRC_LIST})
-target_link_libraries(${PROJECT_NAME} /home/lawliet/Documents/MainProject/GameEngine/libGameEngine.a ${OPENGL_gl_LIBRARY}  SDL2  GLEW  SOIL libBox2D.a boost_system boost_filesystem boost_thread)
+target_link_libraries(${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/ext/libGameEngine.a ${OPENGL_gl_LIBRARY}  SDL2  GLEW  SOIL libBox2D.a boost_system boost_filesystem boost_thread)
 
